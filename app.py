@@ -22,7 +22,6 @@ def get_local_ip():
 # 2. 建立所有連線共用的全域變數 (改為陣列紀錄每一筆評分)
 @st.cache_resource
 def get_global_votes():
-    # 每一筆紀錄將會是一個字典: {"立體綠廊": score, "平面綠園道": score, "意見": comment}
     return []
 
 votes_record = get_global_votes()
@@ -32,15 +31,18 @@ st.set_page_config(page_title="綠園道設計民意調查", page_icon="🗳️"
 st.title("🗳️ 台南綠園道設計：民意模擬投票")
 st.markdown("這是一個讓課堂同學們共同參與的即時投票與回饋系統！")
 
-# 3. 投票按鈕介面 (學生只看得到這裡)
-st.markdown("### 📝 請為以下設計方案評分 (1~5分)：")
+# 3. 投票介面 (學生只看得到這裡)
+st.markdown("### 📝 請填寫您的回饋與評分：")
 
-# 使用 form 來包裝，讓使用者填完後再一次送出
 with st.form("vote_form"):
-    score_A = st.slider("🌟 【立體綠廊】支持度", min_value=1, max_value=5, value=3, step=1)
-    score_B = st.slider("🌳 【平面綠園道】支持度", min_value=1, max_value=5, value=3, step=1)
+    st.markdown("#### 1. 您對本方案的理解程度？")
+    score_understand = st.slider("🧠 理解程度 (1非常不了解 ~ 5非常了解)", min_value=1, max_value=5, value=3, step=1)
     
-    st.markdown("### 💬 您的意見與回饋：")
+    st.markdown("#### 2. 請為以下立場給分 (1~5分)：")
+    score_support = st.slider("🌟 支持立體綠廊", min_value=1, max_value=5, value=3, step=1)
+    score_unsupport = st.slider("❌ 不支持立體綠廊", min_value=1, max_value=5, value=3, step=1)
+    
+    st.markdown("#### 3. 您的意見與回饋：")
     comment = st.text_area("寫下您的看法 (自由選填，最多50字)：", max_chars=50)
     
     submitted = st.form_submit_button("送出評分", use_container_width=True)
@@ -48,8 +50,9 @@ with st.form("vote_form"):
     if submitted:
         # 將紀錄加入全域變數
         votes_record.append({
-            "立體綠廊": score_A,
-            "平面綠園道": score_B,
+            "理解程度": score_understand,
+            "支持立體綠廊": score_support,
+            "不支持立體綠廊": score_unsupport,
             "意見": comment
         })
         st.success("🎉 評分送出成功！感謝您的參與。")
@@ -97,26 +100,26 @@ if admin_password == "admin123":
             st.rerun()
 
     if total_votes > 0:
-        # 計算平均分數
         df = pd.DataFrame(votes_record)
-        avg_A = df["立體綠廊"].mean()
-        avg_B = df["平面綠園道"].mean()
         
-        # 繪製長條圖
-        df_avg = pd.DataFrame({
-            "方案": ["立體綠廊", "平面綠園道"],
-            "平均分數": [avg_A, avg_B]
+        # 繪製圓餅圖 (比較 支持 vs 不支持 的總分比例)
+        total_support = df["支持立體綠廊"].sum()
+        total_unsupport = df["不支持立體綠廊"].sum()
+        
+        df_pie = pd.DataFrame({
+            "選項": ["支持立體綠廊", "不支持立體綠廊"],
+            "總得分": [total_support, total_unsupport]
         })
         
-        fig = px.bar(df_avg, x="方案", y="平均分數", 
-                     title="方案平均支持度比較 (滿分 5 分)",
-                     color="方案",
-                     color_discrete_sequence=['#4C78A8', '#72B7B2'],
-                     range_y=[0, 5],
-                     text=df_avg["平均分數"].round(2)) # 在長條圖上顯示數字
-                     
-        fig.update_traces(textposition='outside', textfont=dict(size=14))
+        fig = px.pie(df_pie, values='總得分', names='選項', 
+                     title="全班支持度比例 (依給分總和計算)",
+                     color_discrete_sequence=['#4C78A8', '#E15759'],
+                     hole=0.4)
+        fig.update_traces(textposition='inside', textinfo='percent+label', 
+                          hovertemplate='<b>%{label}</b><br>總分: %{value}<br>比例: %{percent}')
         st.plotly_chart(fig, use_container_width=True)
+
+        st.markdown(f"*(註：全班平均理解程度為 **{df['理解程度'].mean():.1f}** 分)*")
 
         # 顯示所有意見與評分明細
         st.markdown("### 📝 詳細意見與評分紀錄")
